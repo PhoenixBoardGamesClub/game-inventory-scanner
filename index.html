@@ -225,7 +225,7 @@ async function startCamera() {
    QR SCANNED
 ----------------------------- */
 
-async function onScanSuccess(decodedText) {
+function onScanSuccess(decodedText) {
 
   if (processing) {
     return;
@@ -236,160 +236,137 @@ async function onScanSuccess(decodedText) {
   document.getElementById("status").innerText =
     "Processing " + decodedText + "...";
 
+  const callbackName =
+    "scanCallback_" + Date.now();
 
-  try {
+  window[callbackName] = async function(result) {
 
-    const response = await fetch(SCRIPT_URL, {
+    try {
 
-      method: "POST",
+      if (!result.success) {
 
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
+        document.getElementById("status").innerText =
+          "❌ " + result.message;
 
-      body: JSON.stringify({
-        scanId: decodedText,
-        mode: mode,
-        step: step
-      })
+        processing = false;
+        return;
+      }
 
-    });
+      /* -----------------------------
+         LOAN
+      ----------------------------- */
+
+      if (mode === "loan") {
+
+        if (result.nextStep === 2) {
+
+          step = 2;
+
+          document.getElementById("status").innerText =
+            "✅ Person accepted.\n\n" +
+            "Scan the GAME.";
+
+        } else {
+
+          document.getElementById("status").innerText =
+            "✅ Loan completed.";
+
+          await stopCamera();
+        }
+      }
 
 
-    const result = await response.json();
+      /* -----------------------------
+         RETURN
+      ----------------------------- */
+
+      else if (mode === "return") {
+
+        document.getElementById("status").innerText =
+          "✅ Game returned.";
+
+        await stopCamera();
+      }
 
 
-    if (!result.success) {
+      /* -----------------------------
+         MOVE
+      ----------------------------- */
+
+      else if (mode === "move") {
+
+        if (result.nextStep === 2) {
+
+          step = 2;
+
+          document.getElementById("status").innerText =
+            "✅ Game accepted.\n\n" +
+            "Scan the NEW LOCATION.";
+
+        } else {
+
+          document.getElementById("status").innerText =
+            "✅ Game moved.";
+
+          await stopCamera();
+        }
+      }
+
+    }
+
+    catch (error) {
 
       document.getElementById("status").innerText =
-        "❌ " + result.message;
+        "❌ " + error;
+
+    }
+
+    finally {
 
       processing = false;
 
-      return;
-    }
+      delete window[callbackName];
 
+      const script =
+        document.getElementById(callbackName);
 
-    /* -----------------------------
-       LOAN
-    ----------------------------- */
-
-    if (mode === "loan") {
-
-      if (result.nextStep === 2) {
-
-        step = 2;
-
-        document.getElementById("status").innerText =
-          "✅ Person accepted.\n\n" +
-          "Scan the GAME.";
-
+      if (script) {
+        script.remove();
       }
-
-      else {
-
-        document.getElementById("status").innerText =
-          "✅ Loan information entered.";
-
-        await stopCamera();
-
-      }
-
     }
+  };
 
 
-    /* -----------------------------
-       RETURN
-    ----------------------------- */
-
-    else if (mode === "return") {
-
-      document.getElementById("status").innerText =
-        "✅ Game entered.";
-
-      await stopCamera();
-
-    }
+  const url =
+    SCRIPT_URL +
+    "?scanId=" + encodeURIComponent(decodedText) +
+    "&mode=" + encodeURIComponent(mode) +
+    "&step=" + encodeURIComponent(step) +
+    "&callback=" + encodeURIComponent(callbackName);
 
 
-    /* -----------------------------
-       MOVE
-    ----------------------------- */
+  const script = document.createElement("script");
 
-    else if (mode === "move") {
+  script.id = callbackName;
 
-      if (result.nextStep === 2) {
+  script.src = url;
 
-        step = 2;
-
-        document.getElementById("status").innerText =
-          "✅ Game accepted.\n\n" +
-          "Scan the NEW LOCATION.";
-
-      }
-
-      else {
-
-        document.getElementById("status").innerText =
-          "✅ Move information entered.";
-
-        await stopCamera();
-
-      }
-
-    }
-
-  }
-
-  catch(error) {
+  script.onerror = function() {
 
     document.getElementById("status").innerText =
-      "❌ Connection error.\n\n" +
-      error;
+      "❌ Could not connect to inventory system.";
 
-  }
+    processing = false;
 
-  processing = false;
+    delete window[callbackName];
+
+    script.remove();
+  };
+
+
+  document.body.appendChild(script);
 
 }
-
-
-/* -----------------------------
-   NORMAL QR FAILURE
------------------------------ */
-
-function onScanFailure(error) {
-  // Ignore normal camera scanning failures.
-}
-
-
-/* -----------------------------
-   STOP CAMERA
------------------------------ */
-
-async function stopCamera() {
-
-  if (!scanner) {
-    return;
-  }
-
-  try {
-
-    await scanner.stop();
-
-    scanner.clear();
-
-  }
-
-  catch(error) {
-
-    console.log(error);
-
-  }
-
-  scanner = null;
-}
-
 
 /* -----------------------------
    BACK
