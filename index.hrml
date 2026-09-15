@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>Game Inventory</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      margin-bottom: 25px;
+    }
+
+    .menu {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      max-width: 400px;
+      margin: auto;
+    }
+
+    button {
+      font-size: 22px;
+      font-weight: bold;
+      padding: 18px;
+      border: none;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+
+    #scanner {
+      display: none;
+      max-width: 500px;
+      margin: auto;
+    }
+
+    #reader {
+      width: 100%;
+    }
+
+    #status {
+      font-size: 20px;
+      font-weight: bold;
+      margin: 20px 0;
+      white-space: pre-line;
+    }
+
+    #backButton {
+      margin-top: 15px;
+    }
+
+  </style>
+
+</head>
+
+
+<body>
+
+<h1>🎲 Game Inventory</h1>
+
+
+<div id="menu" class="menu">
+
+  <button onclick="startLoan()">
+    🎲 LOAN GAME
+  </button>
+
+  <button onclick="startReturn()">
+    ↩️ RETURN GAME
+  </button>
+
+  <button onclick="startMove()">
+    📦 MOVE GAME
+  </button>
+
+</div>
+
+
+<div id="scanner">
+
+  <div id="status">
+    Ready
+  </div>
+
+  <div id="reader"></div>
+
+  <button id="backButton"
+          onclick="returnToMenu()">
+    ← Back
+  </button>
+
+</div>
+
+
+<script>
+
+const SCRIPT_URL =
+ https://script.google.com/macros/s/AKfycbwzBXdBwvCzdNhyhE13W7XH0FkgrhwrMngF_fO3oylFuRgwJg1zjnFiGIJJk-pkY7YblA/exec ;
+
+
+let mode = "";
+let step = 1;
+let scanner = null;
+let processing = false;
+
+
+/* -----------------------------
+   LOAN
+----------------------------- */
+
+function startLoan() {
+
+  mode = "loan";
+  step = 1;
+
+  showScanner(
+    "Scan the PERSON who is borrowing the game."
+  );
+}
+
+
+/* -----------------------------
+   RETURN
+----------------------------- */
+
+function startReturn() {
+
+  mode = "return";
+  step = 1;
+
+  showScanner(
+    "Scan the GAME being returned."
+  );
+}
+
+
+/* -----------------------------
+   MOVE
+----------------------------- */
+
+function startMove() {
+
+  mode = "move";
+  step = 1;
+
+  showScanner(
+    "Scan the GAME you are moving."
+  );
+}
+
+
+/* -----------------------------
+   SHOW SCANNER
+----------------------------- */
+
+function showScanner(message) {
+
+  document.getElementById("menu").style.display =
+    "none";
+
+  document.getElementById("scanner").style.display =
+    "block";
+
+  document.getElementById("status").innerText =
+    message;
+
+  startCamera();
+}
+
+
+/* -----------------------------
+   START CAMERA
+----------------------------- */
+
+async function startCamera() {
+
+  try {
+
+    scanner = new Html5Qrcode("reader");
+
+    await scanner.start(
+      { facingMode: "environment" },
+
+      {
+        fps: 10,
+        qrbox: {
+          width: 250,
+          height: 250
+        }
+      },
+
+      onScanSuccess,
+
+      onScanFailure
+    );
+
+  }
+
+  catch(error) {
+
+    document.getElementById("status").innerText =
+      "❌ Camera could not start.\n\n" +
+      error;
+
+  }
+
+}
+
+
+/* -----------------------------
+   QR SCANNED
+----------------------------- */
+
+async function onScanSuccess(decodedText) {
+
+  if (processing) {
+    return;
+  }
+
+  processing = true;
+
+  document.getElementById("status").innerText =
+    "Processing " + decodedText + "...";
+
+
+  try {
+
+    const response = await fetch(SCRIPT_URL, {
+
+      method: "POST",
+
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+
+      body: JSON.stringify({
+        scanId: decodedText,
+        mode: mode,
+        step: step
+      })
+
+    });
+
+
+    const result = await response.json();
+
+
+    if (!result.success) {
+
+      document.getElementById("status").innerText =
+        "❌ " + result.message;
+
+      processing = false;
+
+      return;
+    }
+
+
+    /* -----------------------------
+       LOAN
+    ----------------------------- */
+
+    if (mode === "loan") {
+
+      if (result.nextStep === 2) {
+
+        step = 2;
+
+        document.getElementById("status").innerText =
+          "✅ Person accepted.\n\n" +
+          "Scan the GAME.";
+
+      }
+
+      else {
+
+        document.getElementById("status").innerText =
+          "✅ Loan information entered.";
+
+        await stopCamera();
+
+      }
+
+    }
+
+
+    /* -----------------------------
+       RETURN
+    ----------------------------- */
+
+    else if (mode === "return") {
+
+      document.getElementById("status").innerText =
+        "✅ Game entered.";
+
+      await stopCamera();
+
+    }
+
+
+    /* -----------------------------
+       MOVE
+    ----------------------------- */
+
+    else if (mode === "move") {
+
+      if (result.nextStep === 2) {
+
+        step = 2;
+
+        document.getElementById("status").innerText =
+          "✅ Game accepted.\n\n" +
+          "Scan the NEW LOCATION.";
+
+      }
+
+      else {
+
+        document.getElementById("status").innerText =
+          "✅ Move information entered.";
+
+        await stopCamera();
+
+      }
+
+    }
+
+  }
+
+  catch(error) {
+
+    document.getElementById("status").innerText =
+      "❌ Connection error.\n\n" +
+      error;
+
+  }
+
+  processing = false;
+
+}
+
+
+/* -----------------------------
+   NORMAL QR FAILURE
+----------------------------- */
+
+function onScanFailure(error) {
+  // Ignore normal camera scanning failures.
+}
+
+
+/* -----------------------------
+   STOP CAMERA
+----------------------------- */
+
+async function stopCamera() {
+
+  if (!scanner) {
+    return;
+  }
+
+  try {
+
+    await scanner.stop();
+
+    scanner.clear();
+
+  }
+
+  catch(error) {
+
+    console.log(error);
+
+  }
+
+  scanner = null;
+}
+
+
+/* -----------------------------
+   BACK
+----------------------------- */
+
+async function returnToMenu() {
+
+  await stopCamera();
+
+  document.getElementById("scanner").style.display =
+    "none";
+
+  document.getElementById("menu").style.display =
+    "flex";
+
+  mode = "";
+  step = 1;
+  processing = false;
+
+}
+
+</script>
+
+</body>
+</html>
