@@ -367,7 +367,41 @@ function onScanSuccess(decodedText) {
   document.body.appendChild(script);
 
 }
+/* -----------------------------
+   NORMAL QR FAILURE
+----------------------------- */
 
+function onScanFailure(error) {
+  // Ignore normal scanning failures.
+}
+
+
+/* -----------------------------
+   STOP CAMERA
+----------------------------- */
+
+async function stopCamera() {
+
+  if (!scanner) {
+    return;
+  }
+
+  try {
+
+    await scanner.stop();
+
+    scanner.clear();
+
+  }
+
+  catch(error) {
+
+    console.log(error);
+
+  }
+
+  scanner = null;
+}
 /* -----------------------------
    BACK
 ----------------------------- */
