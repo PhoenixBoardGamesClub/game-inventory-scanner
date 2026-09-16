@@ -36,7 +36,6 @@
       margin: auto;
     }
 
-
     button {
       font-size: 22px;
       font-weight: bold;
@@ -45,6 +44,7 @@
       border-radius: 12px;
       background: white;
       box-shadow: 0 2px 6px rgba(0,0,0,.2);
+      cursor: pointer;
     }
 
     #scanner {
@@ -68,6 +68,69 @@
       margin-top: 15px;
     }
 
+    /* -----------------------------
+       GAME DETAILS CARD
+    ----------------------------- */
+
+    #gameCard {
+      display: none;
+      max-width: 500px;
+      margin: 20px auto 0;
+      text-align: left;
+      background: white;
+      padding: 22px;
+      border-radius: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+
+    #gameCard h2 {
+      text-align: center;
+      margin-top: 0;
+      margin-bottom: 5px;
+      font-size: 28px;
+    }
+
+    .scanId {
+      text-align: center;
+      color: #777;
+      margin-bottom: 20px;
+    }
+
+    .detailSection {
+      border-top: 1px solid #ddd;
+      padding-top: 14px;
+      margin-top: 14px;
+    }
+
+    .detailSection h3 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+
+    .detailRow {
+      margin: 7px 0;
+      line-height: 1.4;
+    }
+
+    .detailLabel {
+      font-weight: bold;
+    }
+
+    .available {
+      font-weight: bold;
+      color: #188038;
+    }
+
+    .unavailable {
+      font-weight: bold;
+      color: #d93025;
+    }
+
+    #detailsBackButton {
+      margin-top: 20px;
+      width: 100%;
+    }
+
   </style>
 
 </head>
@@ -77,6 +140,10 @@
 
 <h1>🎲 Game Inventory</h1>
 
+
+<!-- =============================
+     MAIN MENU
+============================= -->
 
 <div id="menu" class="menu">
 
@@ -92,8 +159,16 @@
     📦 MOVE GAME
   </button>
 
+  <button onclick="startDetails()">
+    🔎 GAME DETAILS
+  </button>
+
 </div>
 
+
+<!-- =============================
+     SCANNER
+============================= -->
 
 <div id="scanner">
 
@@ -111,10 +186,112 @@
 </div>
 
 
+<!-- =============================
+     GAME DETAILS CARD
+============================= -->
+
+<div id="gameCard">
+
+  <h2 id="detailGameName"></h2>
+
+  <div id="detailScanId"
+       class="scanId"></div>
+
+
+  <!-- AVAILABILITY -->
+
+  <div class="detailSection">
+
+    <h3>📍 Availability</h3>
+
+    <div class="detailRow">
+      <span class="detailLabel">Status:</span>
+      <span id="detailStatus"></span>
+    </div>
+
+    <div class="detailRow">
+      <span class="detailLabel">Location:</span>
+      <span id="detailLocation"></span>
+    </div>
+
+    <div id="loanInfo"></div>
+
+  </div>
+
+
+  <!-- GAME INFO -->
+
+  <div class="detailSection">
+
+    <h3>🎲 Game Info</h3>
+
+    <div class="detailRow">
+      <span class="detailLabel">Theme:</span>
+      <span id="detailTheme"></span>
+    </div>
+
+    <div class="detailRow">
+      <span class="detailLabel">Type:</span>
+      <span id="detailType"></span>
+    </div>
+
+    <div class="detailRow">
+      <span class="detailLabel">Style:</span>
+      <span id="detailStyle"></span>
+    </div>
+
+    <div class="detailRow">
+      <span class="detailLabel">Weight:</span>
+      <span id="detailWeight"></span>
+    </div>
+
+  </div>
+
+
+  <!-- PLAYERS -->
+
+  <div class="detailSection">
+
+    <h3>👥 Players</h3>
+
+    <div class="detailRow">
+      <span id="detailPlayers"></span>
+    </div>
+
+    <div class="detailRow">
+      <span class="detailLabel">Ideal:</span>
+      <span id="detailIdeal"></span>
+    </div>
+
+  </div>
+
+
+  <!-- PLAY TIME -->
+
+  <div class="detailSection">
+
+    <h3>⏱️ Play Time</h3>
+
+    <div class="detailRow">
+      <span id="detailTime"></span>
+    </div>
+
+  </div>
+
+
+  <button id="detailsBackButton"
+          onclick="returnToMenu()">
+    ← Back
+  </button>
+
+</div>
+
+
+
 <script>
 
 const SCRIPT_URL =
- "https://script.google.com/macros/s/AKfycbwzBXdBwvCzdNhyhE13W7XH0FkgrhwrMngF_fO3oylFuRgwJg1zjnFiGIJJk-pkY7YblA/exec" ;
+  "https://script.google.com/macros/s/AKfycbwzBXdBwvCzdNhyhE13W7XH0FkgrhwrMngF_fO3oylFuRgwJg1zjnFiGIJJk-pkY7YblA/exec";
 
 
 let mode = "";
@@ -169,12 +346,30 @@ function startMove() {
 
 
 /* -----------------------------
+   DETAILS
+----------------------------- */
+
+function startDetails() {
+
+  mode = "details";
+  step = 1;
+
+  showScanner(
+    "Scan the GAME to view details."
+  );
+}
+
+
+/* -----------------------------
    SHOW SCANNER
 ----------------------------- */
 
 function showScanner(message) {
 
   document.getElementById("menu").style.display =
+    "none";
+
+  document.getElementById("gameCard").style.display =
     "none";
 
   document.getElementById("scanner").style.display =
@@ -244,6 +439,7 @@ function onScanSuccess(decodedText) {
   const callbackName =
     "scanCallback_" + Date.now();
 
+
   window[callbackName] = async function(result) {
 
     try {
@@ -257,11 +453,27 @@ function onScanSuccess(decodedText) {
         return;
       }
 
+
+      /* -----------------------------
+         DETAILS
+      ----------------------------- */
+
+      if (mode === "details") {
+
+        await stopCamera();
+
+        document.getElementById("scanner").style.display =
+          "none";
+
+        displayGameDetails(result.game);
+      }
+
+
       /* -----------------------------
          LOAN
       ----------------------------- */
 
-      if (mode === "loan") {
+      else if (mode === "loan") {
 
         if (result.nextStep === 2) {
 
@@ -271,7 +483,9 @@ function onScanSuccess(decodedText) {
             "✅ Person accepted.\n\n" +
             "Scan the GAME.";
 
-        } else {
+        }
+
+        else {
 
           document.getElementById("status").innerText =
             "✅ Loan completed.";
@@ -308,7 +522,9 @@ function onScanSuccess(decodedText) {
             "✅ Game accepted.\n\n" +
             "Scan the NEW LOCATION.";
 
-        } else {
+        }
+
+        else {
 
           document.getElementById("status").innerText =
             "✅ Game moved.";
@@ -350,11 +566,15 @@ function onScanSuccess(decodedText) {
     "&callback=" + encodeURIComponent(callbackName);
 
 
-  const script = document.createElement("script");
+  const script =
+    document.createElement("script");
 
-  script.id = callbackName;
+  script.id =
+    callbackName;
 
-  script.src = url;
+  script.src =
+    url;
+
 
   script.onerror = function() {
 
@@ -372,6 +592,216 @@ function onScanSuccess(decodedText) {
   document.body.appendChild(script);
 
 }
+
+
+/* -----------------------------
+   DISPLAY GAME DETAILS
+----------------------------- */
+
+function displayGameDetails(game) {
+
+  document.getElementById("gameCard").style.display =
+    "block";
+
+
+  /* GAME NAME */
+
+  document.getElementById("detailGameName").innerText =
+    game.gameName || "Unknown Game";
+
+
+  /* SCAN ID */
+
+  document.getElementById("detailScanId").innerText =
+    game.scanId || "";
+
+
+  /* STATUS */
+
+  const statusElement =
+    document.getElementById("detailStatus");
+
+  statusElement.innerText =
+    game.status || "Unknown";
+
+  statusElement.className =
+    game.status === "Available"
+      ? "available"
+      : "unavailable";
+
+
+  /* LOCATION */
+
+  document.getElementById("detailLocation").innerText =
+    game.location || "Not assigned";
+
+
+  /* -----------------------------
+     LOAN INFORMATION
+  ----------------------------- */
+
+  const loanInfo =
+    document.getElementById("loanInfo");
+
+  loanInfo.innerHTML = "";
+
+
+  if (game.status === "Loaned") {
+
+    if (game.borrower) {
+
+      const borrowerRow =
+        document.createElement("div");
+
+      borrowerRow.className =
+        "detailRow";
+
+      borrowerRow.innerHTML =
+        '<span class="detailLabel">Borrower:</span> ' +
+        escapeHtml(game.borrower);
+
+      loanInfo.appendChild(
+        borrowerRow
+      );
+    }
+
+
+    if (game.expectedReturn) {
+
+      const returnRow =
+        document.createElement("div");
+
+      returnRow.className =
+        "detailRow";
+
+      returnRow.innerHTML =
+        '<span class="detailLabel">Expected Return:</span> ' +
+        escapeHtml(game.expectedReturn);
+
+      loanInfo.appendChild(
+        returnRow
+      );
+    }
+  }
+
+
+  /* -----------------------------
+     GAME INFORMATION
+  ----------------------------- */
+
+  document.getElementById("detailTheme").innerText =
+    game.theme || "—";
+
+  document.getElementById("detailType").innerText =
+    game.gameType || "—";
+
+  document.getElementById("detailStyle").innerText =
+    game.style || "—";
+
+  document.getElementById("detailWeight").innerText =
+    formatWeight(game.weight);
+
+
+  /* -----------------------------
+     PLAYERS
+  ----------------------------- */
+
+  document.getElementById("detailPlayers").innerText =
+    formatPlayers(
+      game.minPlayers,
+      game.maxPlayers
+    );
+
+  document.getElementById("detailIdeal").innerText =
+    game.idealPlayers
+      ? game.idealPlayers + " players"
+      : "—";
+
+
+  /* -----------------------------
+     PLAY TIME
+  ----------------------------- */
+
+  document.getElementById("detailTime").innerText =
+    game.avgTime
+      ? "~" + game.avgTime + " minutes"
+      : "—";
+
+}
+
+
+/* -----------------------------
+   FORMAT WEIGHT
+----------------------------- */
+
+function formatWeight(weight) {
+
+  const value =
+    Number(weight);
+
+  if (!value) {
+    return "—";
+  }
+
+  const names = {
+    1: "Very Light",
+    2: "Light",
+    3: "Medium",
+    4: "Heavy",
+    5: "Very Heavy"
+  };
+
+  const filled =
+    "●".repeat(value);
+
+  const empty =
+    "○".repeat(5 - value);
+
+  return (
+    filled +
+    empty +
+    "  " +
+    value +
+    "/5 — " +
+    names[value]
+  );
+}
+
+
+/* -----------------------------
+   FORMAT PLAYERS
+----------------------------- */
+
+function formatPlayers(min, max) {
+
+  if (!min && !max) {
+    return "—";
+  }
+
+  if (min == max) {
+    return min + " players";
+  }
+
+  return min + "–" + max + " players";
+}
+
+
+/* -----------------------------
+   ESCAPE HTML
+----------------------------- */
+
+function escapeHtml(value) {
+
+  const div =
+    document.createElement("div");
+
+  div.innerText =
+    value || "";
+
+  return div.innerHTML;
+}
+
+
 /* -----------------------------
    NORMAL QR FAILURE
 ----------------------------- */
@@ -407,6 +837,8 @@ async function stopCamera() {
 
   scanner = null;
 }
+
+
 /* -----------------------------
    BACK
 ----------------------------- */
@@ -416,6 +848,9 @@ async function returnToMenu() {
   await stopCamera();
 
   document.getElementById("scanner").style.display =
+    "none";
+
+  document.getElementById("gameCard").style.display =
     "none";
 
   document.getElementById("menu").style.display =
