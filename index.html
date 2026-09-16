@@ -249,6 +249,25 @@
     .subMenuIntro { color:#666; margin:0 0 10px; }
     .subMenuBack { margin-top:10px; background:#e9e9e9; }
 
+    /* =============================
+       FIND A GAME
+    ============================= */
+    #findScreen { display:none; max-width:600px; margin:auto; text-align:left; }
+    #findScreen h2 { text-align:center; margin-bottom:8px; }
+    .findIntro { text-align:center; color:#666; margin:0 0 18px; }
+    .findFilters { background:white; border-radius:16px; padding:18px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+    .filterGroup { margin-bottom:16px; }
+    .filterGroup:last-child { margin-bottom:0; }
+    .filterGroup label { display:block; font-weight:bold; margin-bottom:7px; }
+    .filterControl { box-sizing:border-box; width:100%; font-size:16px; padding:12px; border:1px solid #ccc; border-radius:10px; background:white; }
+    .availabilityToggle { display:flex; align-items:center; gap:10px; font-weight:bold; cursor:pointer; }
+    .availabilityToggle input { width:20px; height:20px; }
+    #findResultsHeader { text-align:center; font-weight:bold; margin:20px 0 12px; }
+    #findGameList { display:flex; flex-direction:column; gap:10px; }
+    #findNoGames { display:none; text-align:center; background:white; border-radius:14px; padding:25px; color:#666; }
+    .findActions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+    .findActions button { font-size:17px; padding:14px 10px; }
+
   </style>
 
 </head>
@@ -302,6 +321,63 @@
   <button class="subMenuBack" onclick="showHome()">← Back</button>
 </div>
 
+
+
+<!-- =============================
+     FIND A GAME
+============================= -->
+<div id="findScreen">
+  <h2>🎯 Find a Game</h2>
+  <p class="findIntro">Tell the library what game night looks like.</p>
+
+  <div class="findFilters">
+    <div class="filterGroup">
+      <label for="findSearch">Search</label>
+      <input id="findSearch" class="filterControl" type="search" placeholder="Name, theme, type, or style..." oninput="applyFindFilters()">
+    </div>
+
+    <div class="filterGroup">
+      <label for="findPlayers">Players</label>
+      <select id="findPlayers" class="filterControl" onchange="applyFindFilters()">
+        <option value="">Any player count</option>
+        <option value="1">1 player</option><option value="2">2 players</option><option value="3">3 players</option>
+        <option value="4">4 players</option><option value="5">5 players</option><option value="6">6 players</option>
+        <option value="7">7 players</option><option value="8">8 players</option><option value="10">10 players</option>
+      </select>
+    </div>
+
+    <div class="filterGroup">
+      <label for="findTime">Maximum Play Time</label>
+      <select id="findTime" class="filterControl" onchange="applyFindFilters()">
+        <option value="">Any length</option><option value="30">30 minutes or less</option><option value="45">45 minutes or less</option>
+        <option value="60">60 minutes or less</option><option value="90">90 minutes or less</option><option value="120">120 minutes or less</option>
+      </select>
+    </div>
+
+    <div class="filterGroup">
+      <label for="findWeight">Weight</label>
+      <select id="findWeight" class="filterControl" onchange="applyFindFilters()">
+        <option value="">Any weight</option><option value="1">1 — Very Light</option><option value="2">2 — Light</option>
+        <option value="3">3 — Medium</option><option value="4">4 — Heavy</option><option value="5">5 — Very Heavy</option>
+      </select>
+    </div>
+
+    <div class="filterGroup"><label for="findStyle">Style</label><select id="findStyle" class="filterControl" onchange="applyFindFilters()"><option value="">Any style</option></select></div>
+    <div class="filterGroup"><label for="findType">Game Type</label><select id="findType" class="filterControl" onchange="applyFindFilters()"><option value="">Any game type</option></select></div>
+    <div class="filterGroup"><label for="findTheme">Theme</label><select id="findTheme" class="filterControl" onchange="applyFindFilters()"><option value="">Any theme</option></select></div>
+
+    <label class="availabilityToggle"><input id="findAvailable" type="checkbox" checked onchange="applyFindFilters()"> Available games only</label>
+
+    <div class="findActions">
+      <button onclick="resetFindFilters()">↺ Reset</button>
+      <button onclick="showPlayMenuFromFind()">← Back</button>
+    </div>
+  </div>
+
+  <div id="findResultsHeader"></div>
+  <div id="findNoGames">No games match those choices.</div>
+  <div id="findGameList"></div>
+</div>
 
 <!-- =============================
      BROWSE GAMES
@@ -490,7 +566,141 @@ function showCleanupMenu() {
 }
 
 function startFindGame() {
-  alert("Find a Game is coming next!");
+  mode = "find";
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("playMenu").style.display = "none";
+  document.getElementById("cleanupMenu").style.display = "none";
+  document.getElementById("browseScreen").style.display = "none";
+  document.getElementById("scanner").style.display = "none";
+  document.getElementById("gameCard").style.display = "none";
+  document.getElementById("findScreen").style.display = "block";
+
+  if (gameCatalog.length > 0) {
+    populateFindOptions();
+    applyFindFilters();
+  } else {
+    document.getElementById("findResultsHeader").innerText = "Loading game library...";
+    loadCatalog();
+  }
+}
+
+function showPlayMenuFromFind() {
+  document.getElementById("findScreen").style.display = "none";
+  showPlayMenu();
+}
+
+function updateDashboardStats() {
+  const total = gameCatalog.length;
+  const available = gameCatalog.filter(g => g.status === "Available").length;
+  const loaned = gameCatalog.filter(g => g.status === "Loaned").length;
+  document.getElementById("totalGames").innerText = total;
+  document.getElementById("availableGames").innerText = available;
+  document.getElementById("loanedGames").innerText = loaned;
+}
+
+function splitCatalogValues(field) {
+  const values = new Set();
+  gameCatalog.forEach(game => {
+    String(game[field] || "").split(",").forEach(v => {
+      const clean = v.trim();
+      if (clean) values.add(clean);
+    });
+  });
+  return Array.from(values).sort((a,b) => a.localeCompare(b));
+}
+
+function fillFindSelect(id, values, label) {
+  const select = document.getElementById(id);
+  const current = select.value;
+  select.innerHTML = `<option value="">Any ${label}</option>`;
+  values.forEach(value => {
+    const option = document.createElement("option");
+    option.value = value; option.innerText = value; select.appendChild(option);
+  });
+  if (values.includes(current)) select.value = current;
+}
+
+function populateFindOptions() {
+  fillFindSelect("findStyle", splitCatalogValues("style"), "style");
+  fillFindSelect("findType", splitCatalogValues("gameType"), "game type");
+  fillFindSelect("findTheme", splitCatalogValues("theme"), "theme");
+}
+
+function catalogHasValue(gameValue, selected) {
+  if (!selected) return true;
+  return String(gameValue || "").split(",").map(v => v.trim()).includes(selected);
+}
+
+function applyFindFilters() {
+  const search = document.getElementById("findSearch").value.trim().toLowerCase();
+  const players = Number(document.getElementById("findPlayers").value || 0);
+  const maxTime = Number(document.getElementById("findTime").value || 0);
+  const weight = Number(document.getElementById("findWeight").value || 0);
+  const style = document.getElementById("findStyle").value;
+  const type = document.getElementById("findType").value;
+  const theme = document.getElementById("findTheme").value;
+  const availableOnly = document.getElementById("findAvailable").checked;
+
+  const matches = gameCatalog.filter(game => {
+    const haystack = [game.gameName, game.theme, game.gameType, game.style].join(" ").toLowerCase();
+    if (search && !haystack.includes(search)) return false;
+    if (availableOnly && game.status !== "Available") return false;
+    if (players && !(Number(game.minPlayers) <= players && Number(game.maxPlayers) >= players)) return false;
+    if (maxTime && Number(game.avgTime) > maxTime) return false;
+    if (weight && Number(game.weight) !== weight) return false;
+    if (!catalogHasValue(game.style, style)) return false;
+    if (!catalogHasValue(game.gameType, type)) return false;
+    if (!catalogHasValue(game.theme, theme)) return false;
+    return true;
+  });
+
+  renderFindGames(matches);
+}
+
+function resetFindFilters() {
+  document.getElementById("findSearch").value = "";
+  document.getElementById("findPlayers").value = "";
+  document.getElementById("findTime").value = "";
+  document.getElementById("findWeight").value = "";
+  document.getElementById("findStyle").value = "";
+  document.getElementById("findType").value = "";
+  document.getElementById("findTheme").value = "";
+  document.getElementById("findAvailable").checked = true;
+  applyFindFilters();
+}
+
+function renderFindGames(games) {
+  const list = document.getElementById("findGameList");
+  const noGames = document.getElementById("findNoGames");
+  list.innerHTML = "";
+  document.getElementById("findResultsHeader").innerText = games.length + (games.length === 1 ? " match" : " matches");
+  noGames.style.display = games.length ? "none" : "block";
+
+  games.forEach(game => {
+    const card = document.createElement("div");
+    card.className = "browseGame";
+    card.onclick = function() { openFindGame(game); };
+
+    const name = document.createElement("div");
+    name.className = "browseGameName"; name.innerText = game.gameName || "Unknown Game";
+    const meta = document.createElement("div"); meta.className = "browseGameMeta";
+    const availability = document.createElement("div");
+    const status = document.createElement("span");
+    status.className = game.status === "Available" ? "browseStatusAvailable" : "browseStatusUnavailable";
+    status.innerText = game.status === "Available" ? "🟢 Available" : "🔴 " + (game.status || "Unavailable");
+    availability.appendChild(status);
+    if (game.location) availability.appendChild(document.createTextNode(" · " + game.location));
+    const stats = document.createElement("div");
+    stats.innerText = "👥 " + formatPlayersShort(game.minPlayers, game.maxPlayers) + " · Ideal " + (game.idealPlayers || "—") + " · ⏱️ " + formatTimeShort(game.avgTime);
+    meta.appendChild(availability); meta.appendChild(stats); card.appendChild(name); card.appendChild(meta); list.appendChild(card);
+  });
+}
+
+function openFindGame(game) {
+  detailsSource = "find";
+  document.getElementById("findScreen").style.display = "none";
+  document.getElementById("gameCard").style.display = "none";
+  displayGameDetails(game);
 }
 
 
@@ -562,10 +772,19 @@ function loadCatalog() {
       gameCatalog =
         result.games || [];
 
+      updateDashboardStats();
+      populateFindOptions();
+
       document.getElementById("browseLoading").style.display =
         "none";
 
-      renderBrowseGames(gameCatalog);
+      if (document.getElementById("browseScreen").style.display === "block") {
+        renderBrowseGames(gameCatalog);
+      }
+
+      if (document.getElementById("findScreen").style.display === "block") {
+        applyFindFilters();
+      }
 
     }
 
@@ -1294,6 +1513,10 @@ function detailsBack() {
     return;
   }
 
+  if (detailsSource === "find") {
+    document.getElementById("findScreen").style.display = "block";
+    return;
+  }
 
   returnToMenu();
 }
@@ -1428,6 +1651,8 @@ async function returnToMenu() {
   document.getElementById("browseScreen").style.display =
     "none";
 
+  document.getElementById("findScreen").style.display = "none";
+
   document.getElementById("playMenu").style.display = "none";
 
   document.getElementById("cleanupMenu").style.display = "none";
@@ -1447,6 +1672,12 @@ async function returnToMenu() {
   detailsSource =
     "";
 }
+
+
+/* Load catalog once at startup for live dashboard counts. */
+window.addEventListener("load", function() {
+  if (gameCatalog.length === 0) loadCatalog();
+});
 
 </script>
 
