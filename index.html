@@ -72,6 +72,65 @@
     button:hover { filter: brightness(1.05); }
     button:active { transform: translateY(3px); box-shadow: 0 1px 0 #3d1a20, var(--soft-shadow); }
 
+    /* Scanner controls + scan feedback modal */
+    .scannerControls {
+      display: flex;
+      gap: 10px;
+      margin: 12px 0 0;
+    }
+
+    .scannerControls button {
+      font-size: 16px;
+      padding: 12px 14px;
+    }
+
+    #scanModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 22px;
+      background: rgba(40, 25, 20, .62);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+    }
+
+    #scanModal.show { display: flex; }
+
+    .scanModalCard {
+      width: min(92vw, 390px);
+      padding: 28px 24px 24px;
+      border: 2px solid var(--brass);
+      border-radius: 18px;
+      background: linear-gradient(180deg, var(--cream), var(--paper));
+      box-shadow: 0 18px 55px rgba(25, 14, 10, .38);
+      animation: modalIn .18s ease-out;
+    }
+
+    @keyframes modalIn {
+      from { transform: scale(.94); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .scanModalIcon { font-size: 42px; margin-bottom: 8px; }
+    .scanModalTitle { margin: 0 0 8px; font-size: 27px; }
+    .scanModalMessage { color: var(--muted); line-height: 1.45; margin: 0; white-space: pre-line; }
+    #scanModalButton { margin-top: 20px; }
+
+    .scanSpinner {
+      width: 42px;
+      height: 42px;
+      margin: 0 auto 14px;
+      border: 4px solid var(--paper-deep);
+      border-top-color: var(--burgundy);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     /* =============================
        HOME / LIBRARY DASHBOARD
     ============================= */
@@ -557,6 +616,12 @@
 
   <div id="reader"></div>
 
+  <div class="scannerControls">
+    <button id="switchCameraButton" onclick="switchCamera()">
+      🔄 Switch Camera
+    </button>
+  </div>
+
   <button id="backButton"
           onclick="returnToMenu()">
     ← Back
@@ -658,6 +723,20 @@
 </div>
 
 
+<!-- =============================
+     SCAN FEEDBACK MODAL
+============================= -->
+<div id="scanModal" role="dialog" aria-modal="true" aria-live="assertive">
+  <div class="scanModalCard">
+    <div id="scanModalSpinner" class="scanSpinner"></div>
+    <div id="scanModalIcon" class="scanModalIcon"></div>
+    <h2 id="scanModalTitle" class="scanModalTitle">Processing Scan…</h2>
+    <p id="scanModalMessage" class="scanModalMessage">Checking the library.</p>
+    <button id="scanModalButton" onclick="closeScanModal()" style="display:none;">OK</button>
+  </div>
+</div>
+
+
 
 <script>
 
@@ -669,6 +748,9 @@ let mode = "";
 let step = 1;
 let scanner = null;
 let processing = false;
+let cameraFacing = "environment";
+let scanModalTimer = null;
+let scanModalAction = null;
 
 let gameCatalog = [];
 let detailsSource = "";
@@ -1299,7 +1381,7 @@ async function startCamera() {
 
     await scanner.start(
 
-      { facingMode: "environment" },
+      { facingMode: cameraFacing },
 
       {
         fps: 10,
@@ -1341,6 +1423,8 @@ function onScanSuccess(decodedText) {
   document.getElementById("status").innerText =
     "Processing " + decodedText + "...";
 
+  showProcessingModal();
+
 
   const callbackName =
     "scanCallback_" + Date.now();
@@ -1356,9 +1440,8 @@ function onScanSuccess(decodedText) {
           document.getElementById("status").innerText =
             "❌ " + result.message;
 
-          processing =
-            false;
-
+          processing = false;
+          showScanModal("error", "Scan Not Completed", result.message, true);
           return;
         }
 
@@ -1367,6 +1450,7 @@ function onScanSuccess(decodedText) {
 
         if (mode === "details") {
 
+          hideScanModal();
           await stopCamera();
 
           document.getElementById("scanner").style.display =
@@ -1384,12 +1468,18 @@ function onScanSuccess(decodedText) {
 
           if (result.nextStep === 2) {
 
-            step =
-              2;
+            step = 2;
 
             document.getElementById("status").innerText =
-              "✅ Person accepted.\n\n" +
               "Scan the GAME.";
+
+            showScanModal(
+              "success",
+              "Person Accepted!",
+              "Now scan the game being borrowed.",
+              false,
+              1500
+            );
 
           }
 
@@ -1399,6 +1489,14 @@ function onScanSuccess(decodedText) {
               "✅ Loan completed.";
 
             await stopCamera();
+            showScanModal(
+              "success",
+              "Game Loaned!",
+              "The loan was completed successfully.",
+              true,
+              0,
+              finishCleanupAction
+            );
           }
         }
 
@@ -1411,6 +1509,14 @@ function onScanSuccess(decodedText) {
             "✅ Game returned.";
 
           await stopCamera();
+          showScanModal(
+            "success",
+            "Game Returned!",
+            "The return was completed successfully.",
+            true,
+            0,
+            finishCleanupAction
+          );
         }
 
 
@@ -1420,12 +1526,18 @@ function onScanSuccess(decodedText) {
 
           if (result.nextStep === 2) {
 
-            step =
-              2;
+            step = 2;
 
             document.getElementById("status").innerText =
-              "✅ Game accepted.\n\n" +
               "Scan the NEW LOCATION.";
+
+            showScanModal(
+              "success",
+              "Game Accepted!",
+              "Now scan the new location.",
+              false,
+              1500
+            );
 
           }
 
@@ -1435,15 +1547,24 @@ function onScanSuccess(decodedText) {
               "✅ Game moved.";
 
             await stopCamera();
+            showScanModal(
+              "success",
+              "Game Moved!",
+              "The game's location was updated successfully.",
+              true,
+              0,
+              finishCleanupAction
+            );
           }
         }
-
       }
 
       catch(error) {
 
         document.getElementById("status").innerText =
           "❌ " + error;
+
+        showScanModal("error", "Something Went Wrong", String(error), true);
 
       }
 
@@ -1487,6 +1608,13 @@ function onScanSuccess(decodedText) {
 
       document.getElementById("status").innerText =
         "❌ Could not connect to inventory system.";
+
+      showScanModal(
+        "error",
+        "Connection Problem",
+        "Could not connect to the inventory system. Please try the scan again.",
+        true
+      );
 
       processing =
         false;
@@ -1728,6 +1856,91 @@ function escapeHtml(value) {
 
 
 /* =============================
+   SCAN FEEDBACK MODAL
+============================= */
+
+function showProcessingModal() {
+  showScanModal("processing", "Processing Scan…", "Checking the library.", false);
+}
+
+function showScanModal(type, title, message, requireTap, timeoutMs = 0, action = null) {
+  clearTimeout(scanModalTimer);
+  scanModalAction = action;
+
+  const modal = document.getElementById("scanModal");
+  const spinner = document.getElementById("scanModalSpinner");
+  const icon = document.getElementById("scanModalIcon");
+  const button = document.getElementById("scanModalButton");
+
+  document.getElementById("scanModalTitle").innerText = title;
+  document.getElementById("scanModalMessage").innerText = message || "";
+
+  spinner.style.display = type === "processing" ? "block" : "none";
+  icon.style.display = type === "processing" ? "none" : "block";
+  icon.innerText = type === "success" ? "✓" : type === "error" ? "⚠" : "";
+  icon.style.color = type === "success" ? "var(--green)" : "var(--red)";
+  button.style.display = requireTap ? "block" : "none";
+
+  modal.classList.add("show");
+
+  if (timeoutMs > 0) {
+    scanModalTimer = setTimeout(closeScanModal, timeoutMs);
+  }
+}
+
+function hideScanModal() {
+  clearTimeout(scanModalTimer);
+  scanModalTimer = null;
+  scanModalAction = null;
+  document.getElementById("scanModal").classList.remove("show");
+}
+
+function closeScanModal() {
+  clearTimeout(scanModalTimer);
+  scanModalTimer = null;
+  document.getElementById("scanModal").classList.remove("show");
+
+  const action = scanModalAction;
+  scanModalAction = null;
+  if (action) action();
+}
+
+function finishCleanupAction() {
+  document.getElementById("scanner").style.display = "none";
+  mode = "";
+  step = 1;
+  processing = false;
+  showCleanupMenu();
+}
+
+
+/* =============================
+   SWITCH CAMERA
+============================= */
+
+async function switchCamera() {
+  if (processing) return;
+
+  const button = document.getElementById("switchCameraButton");
+  button.disabled = true;
+
+  try {
+    cameraFacing = cameraFacing === "environment" ? "user" : "environment";
+    document.getElementById("status").innerText =
+      cameraFacing === "user" ? "Switching to front camera…" : "Switching to rear camera…";
+
+    await stopCamera();
+    await startCamera();
+  } catch (error) {
+    cameraFacing = cameraFacing === "environment" ? "user" : "environment";
+    document.getElementById("status").innerText = "❌ Could not switch cameras.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+
+/* =============================
    NORMAL QR FAILURE
 ============================= */
 
@@ -1770,6 +1983,7 @@ async function stopCamera() {
 
 async function returnToMenu() {
 
+  hideScanModal();
   await stopCamera();
 
   document.getElementById("scanner").style.display =
