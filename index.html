@@ -228,6 +228,27 @@
       width: 100%;
     }
 
+
+    /* =============================
+       LIBRARY DASHBOARD
+    ============================= */
+
+    .libraryHeader { max-width:600px; margin:0 auto 24px; }
+    .libraryHeader h1 { margin:0 0 5px; font-size:32px; }
+    .librarySubtitle { color:#666; font-size:16px; }
+    .libraryStats { max-width:600px; margin:0 auto 24px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .statCard { background:white; border-radius:14px; padding:15px 8px; box-shadow:0 2px 6px rgba(0,0,0,.12); }
+    .statNumber { display:block; font-size:25px; font-weight:bold; }
+    .statLabel { display:block; margin-top:4px; color:#666; font-size:13px; }
+    .dashboardActions { display:flex; flex-direction:column; gap:16px; max-width:500px; margin:auto; }
+    .dashboardButton { min-height:115px; text-align:left; padding:20px; }
+    .dashboardButtonTitle { display:block; font-size:22px; margin-bottom:7px; }
+    .dashboardButtonText { display:block; font-size:15px; font-weight:normal; color:#666; line-height:1.4; }
+    .subMenu { display:none; flex-direction:column; gap:15px; max-width:400px; margin:auto; }
+    .subMenu h2 { margin-bottom:5px; }
+    .subMenuIntro { color:#666; margin:0 0 10px; }
+    .subMenuBack { margin-top:10px; background:#e9e9e9; }
+
   </style>
 
 </head>
@@ -235,35 +256,50 @@
 
 <body>
 
-<h1>🎲 Game Inventory</h1>
-
-
 <!-- =============================
-     MAIN MENU
+     HOME DASHBOARD
 ============================= -->
 
-<div id="menu" class="menu">
+<div id="menu">
+  <div class="libraryHeader">
+    <h1>🎲 J's Game Library</h1>
+    <div class="librarySubtitle">Your Board Game Collection</div>
+  </div>
 
-  <button onclick="startBrowse()">
-    📚 BROWSE GAMES
-  </button>
+  <div class="libraryStats">
+    <div class="statCard"><span id="totalGames" class="statNumber">—</span><span class="statLabel">Games</span></div>
+    <div class="statCard"><span id="availableGames" class="statNumber">—</span><span class="statLabel">Available</span></div>
+    <div class="statCard"><span id="loanedGames" class="statNumber">—</span><span class="statLabel">Loaned</span></div>
+  </div>
 
-  <button onclick="startLoan()">
-    🎲 LOAN GAME
-  </button>
+  <div class="dashboardActions">
+    <button class="dashboardButton" onclick="showPlayMenu()">
+      <span class="dashboardButtonTitle">🎲 What Should We Play?</span>
+      <span class="dashboardButtonText">Browse the library or find the right game for game night.</span>
+    </button>
+    <button class="dashboardButton" onclick="showCleanupMenu()">
+      <span class="dashboardButtonTitle">🧹 Let's Clean Up</span>
+      <span class="dashboardButtonText">Loan, return, or put games back where they belong.</span>
+    </button>
+  </div>
+</div>
 
-  <button onclick="startReturn()">
-    ↩️ RETURN GAME
-  </button>
+<div id="playMenu" class="subMenu">
+  <h2>🎲 What Should We Play?</h2>
+  <p class="subMenuIntro">Explore J's Game Library.</p>
+  <button onclick="startBrowse()">📚 Browse Games</button>
+  <button onclick="startFindGame()">🎯 Find a Game</button>
+  <button onclick="startDetails()">🔎 Game Details</button>
+  <button class="subMenuBack" onclick="showHome()">← Back</button>
+</div>
 
-  <button onclick="startMove()">
-    📦 MOVE GAME
-  </button>
-
-  <button onclick="startDetails()">
-    🔎 GAME DETAILS
-  </button>
-
+<div id="cleanupMenu" class="subMenu">
+  <h2>🧹 Let's Clean Up</h2>
+  <p class="subMenuIntro">Keep the library organized.</p>
+  <button onclick="startLoan()">🎲 Loan Game</button>
+  <button onclick="startReturn()">↩️ Return Game</button>
+  <button onclick="startMove()">📦 Move Game</button>
+  <button class="subMenuBack" onclick="showHome()">← Back</button>
 </div>
 
 
@@ -431,6 +467,33 @@ let processing = false;
 let gameCatalog = [];
 let detailsSource = "";
 
+/* =============================
+   DASHBOARD NAVIGATION
+============================= */
+
+function showHome() {
+  document.getElementById("menu").style.display = "block";
+  document.getElementById("playMenu").style.display = "none";
+  document.getElementById("cleanupMenu").style.display = "none";
+}
+
+function showPlayMenu() {
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("cleanupMenu").style.display = "none";
+  document.getElementById("playMenu").style.display = "flex";
+}
+
+function showCleanupMenu() {
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("playMenu").style.display = "none";
+  document.getElementById("cleanupMenu").style.display = "flex";
+}
+
+function startFindGame() {
+  alert("Find a Game is coming next!");
+}
+
+
 
 /* =============================
    BROWSE GAMES
@@ -442,6 +505,9 @@ function startBrowse() {
 
   document.getElementById("menu").style.display =
     "none";
+
+  document.getElementById("playMenu").style.display = "none";
+  document.getElementById("cleanupMenu").style.display = "none";
 
   document.getElementById("scanner").style.display =
     "none";
@@ -851,6 +917,9 @@ function showScanner(message) {
 
   document.getElementById("menu").style.display =
     "none";
+
+  document.getElementById("playMenu").style.display = "none";
+  document.getElementById("cleanupMenu").style.display = "none";
 
   document.getElementById("browseScreen").style.display =
     "none";
@@ -1359,8 +1428,12 @@ async function returnToMenu() {
   document.getElementById("browseScreen").style.display =
     "none";
 
+  document.getElementById("playMenu").style.display = "none";
+
+  document.getElementById("cleanupMenu").style.display = "none";
+
   document.getElementById("menu").style.display =
-    "flex";
+    "block";
 
   mode =
     "";
