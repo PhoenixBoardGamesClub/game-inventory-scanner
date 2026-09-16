@@ -68,9 +68,106 @@
       margin-top: 15px;
     }
 
-    /* -----------------------------
+
+    /* =============================
+       BROWSE GAMES
+    ============================= */
+
+    #browseScreen {
+      display: none;
+      max-width: 600px;
+      margin: auto;
+      text-align: left;
+    }
+
+    #browseScreen h2 {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    #searchBox {
+      box-sizing: border-box;
+      width: 100%;
+      font-size: 18px;
+      padding: 14px 16px;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      background: white;
+    }
+
+    #browseCount {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin: 4px 0 15px;
+    }
+
+    #browseLoading {
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 30px 10px;
+    }
+
+    #gameList {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .browseGame {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.12);
+      cursor: pointer;
+    }
+
+    .browseGame:active {
+      transform: scale(.99);
+    }
+
+    .browseGameName {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .browseGameMeta {
+      color: #555;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .browseStatusAvailable {
+      color: #188038;
+      font-weight: bold;
+    }
+
+    .browseStatusUnavailable {
+      color: #d93025;
+      font-weight: bold;
+    }
+
+    #browseBackButton {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    #noGames {
+      display: none;
+      text-align: center;
+      background: white;
+      border-radius: 14px;
+      padding: 25px;
+      color: #666;
+    }
+
+
+    /* =============================
        GAME DETAILS CARD
-    ----------------------------- */
+    ============================= */
 
     #gameCard {
       display: none;
@@ -147,6 +244,10 @@
 
 <div id="menu" class="menu">
 
+  <button onclick="startBrowse()">
+    📚 BROWSE GAMES
+  </button>
+
   <button onclick="startLoan()">
     🎲 LOAN GAME
   </button>
@@ -161,6 +262,42 @@
 
   <button onclick="startDetails()">
     🔎 GAME DETAILS
+  </button>
+
+</div>
+
+
+<!-- =============================
+     BROWSE GAMES
+============================= -->
+
+<div id="browseScreen">
+
+  <h2>📚 Browse Games</h2>
+
+  <input
+    id="searchBox"
+    type="search"
+    placeholder="🔍 Search games..."
+    autocomplete="off"
+    oninput="filterBrowseGames()"
+  >
+
+  <div id="browseCount"></div>
+
+  <div id="browseLoading">
+    Loading game library...
+  </div>
+
+  <div id="noGames">
+    No games match your search.
+  </div>
+
+  <div id="gameList"></div>
+
+  <button id="browseBackButton"
+          onclick="returnToMenu()">
+    ← Back
   </button>
 
 </div>
@@ -198,8 +335,6 @@
        class="scanId"></div>
 
 
-  <!-- AVAILABILITY -->
-
   <div class="detailSection">
 
     <h3>📍 Availability</h3>
@@ -218,8 +353,6 @@
 
   </div>
 
-
-  <!-- GAME INFO -->
 
   <div class="detailSection">
 
@@ -248,8 +381,6 @@
   </div>
 
 
-  <!-- PLAYERS -->
-
   <div class="detailSection">
 
     <h3>👥 Players</h3>
@@ -266,8 +397,6 @@
   </div>
 
 
-  <!-- PLAY TIME -->
-
   <div class="detailSection">
 
     <h3>⏱️ Play Time</h3>
@@ -280,7 +409,7 @@
 
 
   <button id="detailsBackButton"
-          onclick="returnToMenu()">
+          onclick="detailsBack()">
     ← Back
   </button>
 
@@ -299,10 +428,361 @@ let step = 1;
 let scanner = null;
 let processing = false;
 
+let gameCatalog = [];
+let detailsSource = "";
+
+
+/* =============================
+   BROWSE GAMES
+============================= */
+
+function startBrowse() {
+
+  mode = "browse";
+
+  document.getElementById("menu").style.display =
+    "none";
+
+  document.getElementById("scanner").style.display =
+    "none";
+
+  document.getElementById("gameCard").style.display =
+    "none";
+
+  document.getElementById("browseScreen").style.display =
+    "block";
+
+  document.getElementById("searchBox").value =
+    "";
+
+  if (gameCatalog.length > 0) {
+
+    renderBrowseGames(gameCatalog);
+    return;
+  }
+
+  document.getElementById("browseLoading").style.display =
+    "block";
+
+  document.getElementById("gameList").innerHTML =
+    "";
+
+  document.getElementById("browseCount").innerText =
+    "";
+
+  loadCatalog();
+}
+
 
 /* -----------------------------
-   LOAN
+   LOAD CATALOG
 ----------------------------- */
+
+function loadCatalog() {
+
+  const callbackName =
+    "catalogCallback_" + Date.now();
+
+  window[callbackName] = function(result) {
+
+    try {
+
+      if (!result.success) {
+        throw new Error(
+          result.message || "Could not load game catalog."
+        );
+      }
+
+      gameCatalog =
+        result.games || [];
+
+      document.getElementById("browseLoading").style.display =
+        "none";
+
+      renderBrowseGames(gameCatalog);
+
+    }
+
+    catch(error) {
+
+      document.getElementById("browseLoading").innerText =
+        "❌ " + error.message;
+
+    }
+
+    finally {
+
+      delete window[callbackName];
+
+      const script =
+        document.getElementById(callbackName);
+
+      if (script) {
+        script.remove();
+      }
+    }
+  };
+
+
+  const url =
+    SCRIPT_URL +
+    "?mode=catalog" +
+    "&callback=" + encodeURIComponent(callbackName);
+
+
+  const script =
+    document.createElement("script");
+
+  script.id =
+    callbackName;
+
+  script.src =
+    url;
+
+
+  script.onerror = function() {
+
+    document.getElementById("browseLoading").innerText =
+      "❌ Could not connect to inventory system.";
+
+    delete window[callbackName];
+
+    script.remove();
+  };
+
+
+  document.body.appendChild(script);
+}
+
+
+/* -----------------------------
+   FILTER BROWSE GAMES
+----------------------------- */
+
+function filterBrowseGames() {
+
+  const search =
+    document
+      .getElementById("searchBox")
+      .value
+      .trim()
+      .toLowerCase();
+
+  if (!search) {
+    renderBrowseGames(gameCatalog);
+    return;
+  }
+
+  const filtered =
+    gameCatalog.filter(game => {
+
+      return (
+        String(game.gameName || "")
+          .toLowerCase()
+          .includes(search)
+        ||
+        String(game.theme || "")
+          .toLowerCase()
+          .includes(search)
+        ||
+        String(game.gameType || "")
+          .toLowerCase()
+          .includes(search)
+        ||
+        String(game.style || "")
+          .toLowerCase()
+          .includes(search)
+      );
+    });
+
+  renderBrowseGames(filtered);
+}
+
+
+/* -----------------------------
+   RENDER BROWSE LIST
+----------------------------- */
+
+function renderBrowseGames(games) {
+
+  const list =
+    document.getElementById("gameList");
+
+  const noGames =
+    document.getElementById("noGames");
+
+  list.innerHTML =
+    "";
+
+  document.getElementById("browseCount").innerText =
+    games.length +
+    (games.length === 1 ? " game" : " games");
+
+
+  if (games.length === 0) {
+
+    noGames.style.display =
+      "block";
+
+    return;
+  }
+
+  noGames.style.display =
+    "none";
+
+
+  games.forEach(game => {
+
+    const card =
+      document.createElement("div");
+
+    card.className =
+      "browseGame";
+
+    card.onclick = function() {
+      openBrowseGame(game);
+    };
+
+
+    const name =
+      document.createElement("div");
+
+    name.className =
+      "browseGameName";
+
+    name.innerText =
+      game.gameName || "Unknown Game";
+
+
+    const meta =
+      document.createElement("div");
+
+    meta.className =
+      "browseGameMeta";
+
+
+    const availability =
+      document.createElement("div");
+
+    const status =
+      document.createElement("span");
+
+    status.className =
+      game.status === "Available"
+        ? "browseStatusAvailable"
+        : "browseStatusUnavailable";
+
+    status.innerText =
+      game.status === "Available"
+        ? "🟢 Available"
+        : "🔴 " + (game.status || "Unavailable");
+
+    availability.appendChild(status);
+
+
+    if (game.location) {
+
+      availability.appendChild(
+        document.createTextNode(
+          " · " + game.location
+        )
+      );
+    }
+
+
+    const stats =
+      document.createElement("div");
+
+    stats.innerText =
+      "👥 " +
+      formatPlayersShort(
+        game.minPlayers,
+        game.maxPlayers
+      ) +
+      "   ·   ⏱️ " +
+      formatTimeShort(
+        game.avgTime
+      );
+
+
+    meta.appendChild(
+      availability
+    );
+
+    meta.appendChild(
+      stats
+    );
+
+
+    card.appendChild(
+      name
+    );
+
+    card.appendChild(
+      meta
+    );
+
+    list.appendChild(
+      card
+    );
+  });
+}
+
+
+/* -----------------------------
+   OPEN GAME FROM BROWSE
+----------------------------- */
+
+function openBrowseGame(game) {
+
+  detailsSource =
+    "browse";
+
+  document.getElementById("browseScreen").style.display =
+    "none";
+
+  document.getElementById("gameCard").style.display =
+    "none";
+
+  displayGameDetails(game);
+}
+
+
+/* -----------------------------
+   SHORT PLAYER DISPLAY
+----------------------------- */
+
+function formatPlayersShort(min, max) {
+
+  if (!min && !max) {
+    return "—";
+  }
+
+  if (min == max) {
+    return String(min);
+  }
+
+  return min + "–" + max;
+}
+
+
+/* -----------------------------
+   SHORT TIME DISPLAY
+----------------------------- */
+
+function formatTimeShort(time) {
+
+  if (!time) {
+    return "—";
+  }
+
+  return "~" + time + " min";
+}
+
+
+/* =============================
+   LOAN
+============================= */
 
 function startLoan() {
 
@@ -315,9 +795,9 @@ function startLoan() {
 }
 
 
-/* -----------------------------
+/* =============================
    RETURN
------------------------------ */
+============================= */
 
 function startReturn() {
 
@@ -330,9 +810,9 @@ function startReturn() {
 }
 
 
-/* -----------------------------
+/* =============================
    MOVE
------------------------------ */
+============================= */
 
 function startMove() {
 
@@ -345,14 +825,17 @@ function startMove() {
 }
 
 
-/* -----------------------------
+/* =============================
    DETAILS
------------------------------ */
+============================= */
 
 function startDetails() {
 
   mode = "details";
   step = 1;
+
+  detailsSource =
+    "scanner";
 
   showScanner(
     "Scan the GAME to view details."
@@ -360,13 +843,16 @@ function startDetails() {
 }
 
 
-/* -----------------------------
+/* =============================
    SHOW SCANNER
------------------------------ */
+============================= */
 
 function showScanner(message) {
 
   document.getElementById("menu").style.display =
+    "none";
+
+  document.getElementById("browseScreen").style.display =
     "none";
 
   document.getElementById("gameCard").style.display =
@@ -382,17 +868,19 @@ function showScanner(message) {
 }
 
 
-/* -----------------------------
+/* =============================
    START CAMERA
------------------------------ */
+============================= */
 
 async function startCamera() {
 
   try {
 
-    scanner = new Html5Qrcode("reader");
+    scanner =
+      new Html5Qrcode("reader");
 
     await scanner.start(
+
       { facingMode: "environment" },
 
       {
@@ -415,15 +903,13 @@ async function startCamera() {
     document.getElementById("status").innerText =
       "❌ Camera could not start.\n\n" +
       error;
-
   }
-
 }
 
 
-/* -----------------------------
+/* =============================
    QR SCANNED
------------------------------ */
+============================= */
 
 function onScanSuccess(decodedText) {
 
@@ -431,131 +917,133 @@ function onScanSuccess(decodedText) {
     return;
   }
 
-  processing = true;
+  processing =
+    true;
 
   document.getElementById("status").innerText =
     "Processing " + decodedText + "...";
+
 
   const callbackName =
     "scanCallback_" + Date.now();
 
 
-  window[callbackName] = async function(result) {
+  window[callbackName] =
+    async function(result) {
 
-    try {
+      try {
 
-      if (!result.success) {
-
-        document.getElementById("status").innerText =
-          "❌ " + result.message;
-
-        processing = false;
-        return;
-      }
-
-
-      /* -----------------------------
-         DETAILS
-      ----------------------------- */
-
-      if (mode === "details") {
-
-        await stopCamera();
-
-        document.getElementById("scanner").style.display =
-          "none";
-
-        displayGameDetails(result.game);
-      }
-
-
-      /* -----------------------------
-         LOAN
-      ----------------------------- */
-
-      else if (mode === "loan") {
-
-        if (result.nextStep === 2) {
-
-          step = 2;
+        if (!result.success) {
 
           document.getElementById("status").innerText =
-            "✅ Person accepted.\n\n" +
-            "Scan the GAME.";
+            "❌ " + result.message;
 
+          processing =
+            false;
+
+          return;
         }
 
-        else {
+
+        /* DETAILS */
+
+        if (mode === "details") {
+
+          await stopCamera();
+
+          document.getElementById("scanner").style.display =
+            "none";
+
+          displayGameDetails(
+            result.game
+          );
+        }
+
+
+        /* LOAN */
+
+        else if (mode === "loan") {
+
+          if (result.nextStep === 2) {
+
+            step =
+              2;
+
+            document.getElementById("status").innerText =
+              "✅ Person accepted.\n\n" +
+              "Scan the GAME.";
+
+          }
+
+          else {
+
+            document.getElementById("status").innerText =
+              "✅ Loan completed.";
+
+            await stopCamera();
+          }
+        }
+
+
+        /* RETURN */
+
+        else if (mode === "return") {
 
           document.getElementById("status").innerText =
-            "✅ Loan completed.";
+            "✅ Game returned.";
 
           await stopCamera();
         }
+
+
+        /* MOVE */
+
+        else if (mode === "move") {
+
+          if (result.nextStep === 2) {
+
+            step =
+              2;
+
+            document.getElementById("status").innerText =
+              "✅ Game accepted.\n\n" +
+              "Scan the NEW LOCATION.";
+
+          }
+
+          else {
+
+            document.getElementById("status").innerText =
+              "✅ Game moved.";
+
+            await stopCamera();
+          }
+        }
+
       }
 
-
-      /* -----------------------------
-         RETURN
-      ----------------------------- */
-
-      else if (mode === "return") {
+      catch(error) {
 
         document.getElementById("status").innerText =
-          "✅ Game returned.";
+          "❌ " + error;
 
-        await stopCamera();
       }
 
+      finally {
 
-      /* -----------------------------
-         MOVE
-      ----------------------------- */
+        processing =
+          false;
 
-      else if (mode === "move") {
+        delete window[callbackName];
 
-        if (result.nextStep === 2) {
+        const script =
+          document.getElementById(callbackName);
 
-          step = 2;
-
-          document.getElementById("status").innerText =
-            "✅ Game accepted.\n\n" +
-            "Scan the NEW LOCATION.";
-
-        }
-
-        else {
-
-          document.getElementById("status").innerText =
-            "✅ Game moved.";
-
-          await stopCamera();
+        if (script) {
+          script.remove();
         }
       }
-
-    }
-
-    catch (error) {
-
-      document.getElementById("status").innerText =
-        "❌ " + error;
-
-    }
-
-    finally {
-
-      processing = false;
-
-      delete window[callbackName];
-
-      const script =
-        document.getElementById(callbackName);
-
-      if (script) {
-        script.remove();
-      }
-    }
-  };
+    };
 
 
   const url =
@@ -576,27 +1064,30 @@ function onScanSuccess(decodedText) {
     url;
 
 
-  script.onerror = function() {
+  script.onerror =
+    function() {
 
-    document.getElementById("status").innerText =
-      "❌ Could not connect to inventory system.";
+      document.getElementById("status").innerText =
+        "❌ Could not connect to inventory system.";
 
-    processing = false;
+      processing =
+        false;
 
-    delete window[callbackName];
+      delete window[callbackName];
 
-    script.remove();
-  };
+      script.remove();
+    };
 
 
-  document.body.appendChild(script);
-
+  document.body.appendChild(
+    script
+  );
 }
 
 
-/* -----------------------------
+/* =============================
    DISPLAY GAME DETAILS
------------------------------ */
+============================= */
 
 function displayGameDetails(game) {
 
@@ -604,19 +1095,13 @@ function displayGameDetails(game) {
     "block";
 
 
-  /* GAME NAME */
-
   document.getElementById("detailGameName").innerText =
     game.gameName || "Unknown Game";
 
 
-  /* SCAN ID */
-
   document.getElementById("detailScanId").innerText =
     game.scanId || "";
 
-
-  /* STATUS */
 
   const statusElement =
     document.getElementById("detailStatus");
@@ -630,20 +1115,17 @@ function displayGameDetails(game) {
       : "unavailable";
 
 
-  /* LOCATION */
-
   document.getElementById("detailLocation").innerText =
     game.location || "Not assigned";
 
 
-  /* -----------------------------
-     LOAN INFORMATION
-  ----------------------------- */
+  /* LOAN INFORMATION */
 
   const loanInfo =
     document.getElementById("loanInfo");
 
-  loanInfo.innerHTML = "";
+  loanInfo.innerHTML =
+    "";
 
 
   if (game.status === "Loaned") {
@@ -685,9 +1167,7 @@ function displayGameDetails(game) {
   }
 
 
-  /* -----------------------------
-     GAME INFORMATION
-  ----------------------------- */
+  /* GAME INFORMATION */
 
   document.getElementById("detailTheme").innerText =
     game.theme || "—";
@@ -699,12 +1179,12 @@ function displayGameDetails(game) {
     game.style || "—";
 
   document.getElementById("detailWeight").innerText =
-    formatWeight(game.weight);
+    formatWeight(
+      game.weight
+    );
 
 
-  /* -----------------------------
-     PLAYERS
-  ----------------------------- */
+  /* PLAYERS */
 
   document.getElementById("detailPlayers").innerText =
     formatPlayers(
@@ -718,21 +1198,41 @@ function displayGameDetails(game) {
       : "—";
 
 
-  /* -----------------------------
-     PLAY TIME
-  ----------------------------- */
+  /* PLAY TIME */
 
   document.getElementById("detailTime").innerText =
     game.avgTime
       ? "~" + game.avgTime + " minutes"
       : "—";
-
 }
 
 
-/* -----------------------------
+/* =============================
+   DETAILS BACK
+============================= */
+
+function detailsBack() {
+
+  document.getElementById("gameCard").style.display =
+    "none";
+
+
+  if (detailsSource === "browse") {
+
+    document.getElementById("browseScreen").style.display =
+      "block";
+
+    return;
+  }
+
+
+  returnToMenu();
+}
+
+
+/* =============================
    FORMAT WEIGHT
------------------------------ */
+============================= */
 
 function formatWeight(weight) {
 
@@ -743,6 +1243,7 @@ function formatWeight(weight) {
     return "—";
   }
 
+
   const names = {
     1: "Very Light",
     2: "Light",
@@ -751,11 +1252,13 @@ function formatWeight(weight) {
     5: "Very Heavy"
   };
 
+
   const filled =
     "●".repeat(value);
 
   const empty =
     "○".repeat(5 - value);
+
 
   return (
     filled +
@@ -768,9 +1271,9 @@ function formatWeight(weight) {
 }
 
 
-/* -----------------------------
+/* =============================
    FORMAT PLAYERS
------------------------------ */
+============================= */
 
 function formatPlayers(min, max) {
 
@@ -786,9 +1289,9 @@ function formatPlayers(min, max) {
 }
 
 
-/* -----------------------------
+/* =============================
    ESCAPE HTML
------------------------------ */
+============================= */
 
 function escapeHtml(value) {
 
@@ -802,18 +1305,18 @@ function escapeHtml(value) {
 }
 
 
-/* -----------------------------
+/* =============================
    NORMAL QR FAILURE
------------------------------ */
+============================= */
 
 function onScanFailure(error) {
   // Ignore normal scanning failures.
 }
 
 
-/* -----------------------------
+/* =============================
    STOP CAMERA
------------------------------ */
+============================= */
 
 async function stopCamera() {
 
@@ -832,16 +1335,16 @@ async function stopCamera() {
   catch(error) {
 
     console.log(error);
-
   }
 
-  scanner = null;
+  scanner =
+    null;
 }
 
 
-/* -----------------------------
-   BACK
------------------------------ */
+/* =============================
+   RETURN TO MENU
+============================= */
 
 async function returnToMenu() {
 
@@ -853,13 +1356,23 @@ async function returnToMenu() {
   document.getElementById("gameCard").style.display =
     "none";
 
+  document.getElementById("browseScreen").style.display =
+    "none";
+
   document.getElementById("menu").style.display =
     "flex";
 
-  mode = "";
-  step = 1;
-  processing = false;
+  mode =
+    "";
 
+  step =
+    1;
+
+  processing =
+    false;
+
+  detailsSource =
+    "";
 }
 
 </script>
